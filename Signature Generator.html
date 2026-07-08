@@ -254,6 +254,14 @@ const ASSETS = {"logo": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAeAAAAC8C
 
 document.getElementById('hdrLogo').src = ASSETS.logo;
 
+/* Preload logo + icons as decoded images so the PNG export is fully synchronous */
+const IMG = {};
+['logo','wm','pin','phone','globe','mail'].forEach(k=>{
+  const i=new Image(); i.src=ASSETS[k];
+  if(i.decode) i.decode().catch(()=>{});
+  IMG[k]=i;
+});
+
 /* ===== State ===== */
 const state = { mode:'illustration', photo:null };
 const $ = id => document.getElementById(id);
@@ -384,42 +392,84 @@ async function copyHtml(){
   catch(e){toast('Copy failed — try Copy signature');}
 }
 function exportImage(cb){
-  // Serialize the live signature to well-formed XHTML so it can be rasterised via SVG.
-  const tbl = $('sigMount').firstElementChild;
-  const rect = tbl.getBoundingClientRect();
-  const w = Math.ceil(rect.width), h = Math.ceil(rect.height);
-  const node = tbl.cloneNode(true);
-  node.setAttribute('xmlns','http://www.w3.org/1999/xhtml');
-  const xhtml = new XMLSerializer().serializeToString(node);
+  // Composite the signature directly onto a canvas — fully synchronous, so an
+  // uploaded photo can never be missing (the avatar is copied canvas-to-canvas).
+  const val=id=>$('f_'+id).value.trim();
+  const name=val('name'), role=val('role');
+  const rows=[
+    [IMG.phone, val('phone')],
+    [IMG.phone, val('mobile')],
+    [IMG.globe, val('web')],
+    [IMG.mail,  val('email')],
+    [IMG.pin,   val('addr')]
+  ].filter(r=>r[1]);
 
-  // Decode EVERY embedded image first so none are missing on the first export.
-  const srcs = [...xhtml.matchAll(/src="([^"]+)"/g)].map(m=>m[1]);
-  const decodeAll = Promise.all(srcs.map(s=>{
-    const i = new Image(); i.src = s;
-    return (i.decode ? i.decode() : Promise.resolve()).catch(()=>{});
-  }));
+  // make sure the avatar canvas reflects the current selection
+  renderAvatar(()=>{});
+  const avatar=$('avatarCanvas');
 
-  decodeAll.then(()=>{
-    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="'+w+'" height="'+h+'">'
-      +'<foreignObject x="0" y="0" width="'+w+'" height="'+h+'">'+xhtml+'</foreignObject></svg>';
-    const scale = 2;
-    const img = new Image();
-    const draw = ()=>{
-      const cv=document.createElement('canvas');
-      cv.width=w*scale; cv.height=h*scale;
-      const ctx=cv.getContext('2d');
-      ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,cv.width,cv.height);
-      ctx.setTransform(scale,0,0,scale,0,0);
-      ctx.drawImage(img,0,0);
-      try{ cb(null, cv.toDataURL('image/png')); }
-      catch(err){ cb(err); }
-    };
-    img.onerror = ()=>cb(new Error('render-failed'));
-    img.src = 'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
-    // decode() guarantees the SVG (with its now-cached inner images) is fully ready before we draw.
-    if(img.decode){ img.decode().then(draw).catch(()=>{ img.onload = draw; }); }
-    else { img.onload = draw; }
+  const SCALE=2;
+  // measure to size the canvas so every contact line fits on one line
+  const meas=document.createElement('canvas').getContext('2d');
+  meas.font='13px Arial';
+  let maxT=0; rows.forEach(r=>maxT=Math.max(maxT, meas.measureText(r[1]).width));
+
+  const LP=208, DIV=2, RPADL=24, RPADR=26, TOPPAD=26;
+  const iconW=19, gap=11, rowH=30;
+  const rightStart=LP+DIV+RPADL;
+  const logoW=196;
+  const logoH= IMG.logo.naturalHeight ? Math.round(logoW*IMG.logo.naturalHeight/IMG.logo.naturalWidth) : 78;
+  const rightBlockW=Math.max(logoW, iconW+gap+Math.ceil(maxT));
+  const W=rightStart+rightBlockW+RPADR;
+
+  const logoGap=16;
+  const rightGroupH=logoH+logoGap+rows.length*rowH;
+  const leftGroupH=118+14+22+7+15;
+  const H=Math.ceil(Math.max(rightGroupH,leftGroupH)+TOPPAD*2);
+
+  const cv=document.createElement('canvas');
+  cv.width=W*SCALE; cv.height=H*SCALE;
+  const ctx=cv.getContext('2d');
+  ctx.setTransform(SCALE,0,0,SCALE,0,0);
+
+  // backgrounds
+  ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,W,H);
+  try{ ctx.drawImage(IMG.wm,0,0,LP,H); }catch(e){}        // faint watermark on left panel
+  ctx.fillStyle='#005CA9';
+  ctx.fillRect(0,0,3,H);                                   // left accent border
+  ctx.fillRect(LP,0,DIV,H);                                // divider
+
+  // ---- left column (vertically centred) ----
+  const lcx=Math.round(LP/2);
+  const avatarTop=Math.max(TOPPAD,Math.round((H-leftGroupH)/2));
+  ctx.drawImage(avatar, lcx-59, avatarTop, 118, 118);
+  ctx.textAlign='center';
+  if('letterSpacing' in ctx) ctx.letterSpacing='0px';
+  if(name){
+    ctx.fillStyle='#1b2733'; ctx.font='bold 18px Arial'; ctx.textBaseline='alphabetic';
+    ctx.fillText(name, lcx, avatarTop+118+14+16);
+  }
+  if(role){
+    ctx.fillStyle='#005CA9'; ctx.font='11px Arial';
+    if('letterSpacing' in ctx) ctx.letterSpacing='2.5px';
+    ctx.fillText(role.toUpperCase(), lcx, avatarTop+118+14+16+22);
+    if('letterSpacing' in ctx) ctx.letterSpacing='0px';
+  }
+
+  // ---- right column (vertically centred) ----
+  const rTop=Math.max(TOPPAD,Math.round((H-rightGroupH)/2));
+  ctx.drawImage(IMG.logo, rightStart, rTop, logoW, logoH);
+  ctx.textAlign='left'; ctx.textBaseline='middle';
+  const rowsY=rTop+logoH+logoGap;
+  rows.forEach((r,i)=>{
+    const cy=rowsY+rowH/2+i*rowH;
+    try{ ctx.drawImage(r[0], rightStart, Math.round(cy-iconW/2), iconW, iconW); }catch(e){}
+    ctx.fillStyle='#3a4a58'; ctx.font='13px Arial';
+    ctx.fillText(r[1], rightStart+iconW+gap, cy+1);
   });
+
+  try{ cb(null, cv.toDataURL('image/png')); }
+  catch(err){ cb(err); }
 }
 function downloadImage(){
   exportImage((err,url)=>{
