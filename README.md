@@ -1,4 +1,4 @@
-# Choices Flooring Mackay — Email Signature Generator
+# Choices Flooring Mackay - Email Signature Generator
 
 A single-page web app that generates brand-consistent email signatures for
 Choices Flooring Mackay staff. Enter a staff member's details, preview the
