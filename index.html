@@ -150,19 +150,7 @@
       <label for="f_addr">Address</label>
       <input type="text" id="f_addr" placeholder="14 Discovery Lane, North Mackay QLD 4740" value="14 Discovery Lane, North Mackay QLD 4740">
     </div>
-    <details class="adv">
-      <summary>Social links</summary>
-      <div class="adv-body">
-        <div class="field">
-          <label for="f_fb">Facebook URL</label>
-          <input type="text" id="f_fb" value="https://www.facebook.com/choicesmackay/">
-        </div>
-        <div class="field">
-          <label for="f_ig">Instagram URL <span style="text-transform:none;font-weight:400">(optional)</span></label>
-          <input type="text" id="f_ig" placeholder="https://www.instagram.com/..." value="">
-        </div>
-      </div>
-    </details>
+    <p style="font-size:12px;color:var(--ink-soft);margin:2px 0 0;line-height:1.5">Facebook &amp; Instagram links are fixed to the official Choices Flooring Mackay pages.</p>
   </section>
 
   <section>
@@ -213,6 +201,10 @@ const A = {
   pin:'https://i.imgur.com/mY6fYrL.png'
 };
 
+/* Fixed official social links (not user-editable) */
+const FB='https://www.facebook.com/choicesmackay/';
+const IG='https://www.instagram.com/choicesflooringmky/';
+
 const state = { fmt:'headshot', headshotData:null };
 const $ = id => document.getElementById(id);
 const v = id => ($('f_'+id).value||'').trim();
@@ -260,7 +252,7 @@ function topLogo(){
     +'</td></tr></table>';
 }
 function strip(){
-  const addr=v('addr'), fb=v('fb'), ig=v('ig');
+  const addr=v('addr'), fb=FB, ig=IG;
   let socials='';
   if(fb) socials+='<a style="text-decoration:none;" href="'+esc(fb)+'" target="_blank"><img src="'+A.fb+'" height="20" width="20"></a>';
   if(fb && ig) socials+='&nbsp;';
@@ -355,7 +347,7 @@ function loadImg(src){
 async function exportPNG(cb){
   try{ await document.fonts.load('700 15px "Nunito Sans"'); await document.fonts.load('400 12px "Nunito Sans"'); await document.fonts.ready; }catch(e){}
   const fmt=state.fmt;
-  const name=v('name'),title=v('title'),phone=v('phone'),mobile=v('mobile'),email=v('email'),web=v('web'),addr=v('addr'),fb=v('fb'),ig=v('ig');
+  const name=v('name'),title=v('title'),phone=v('phone'),mobile=v('mobile'),email=v('email'),web=v('web'),addr=v('addr'),fb=FB,ig=IG;
   const I={};
   await Promise.all(['banner','ph','mob','mail','web','pin','fb','ig'].map(async k=> I[k]=await loadImg(A[k])));
   const hs = fmt==='headshot' ? await loadImg(headshotSrc()) : null;
@@ -457,7 +449,7 @@ function downloadPng(){
   });
 }
 
-['name','title','phone','mobile','email','web','addr','fb','ig'].forEach(f=>$('f_'+f)&&$('f_'+f).addEventListener('input',refresh));
+['name','title','phone','mobile','email','web','addr'].forEach(f=>$('f_'+f)&&$('f_'+f).addEventListener('input',refresh));
 $('fmtSeg').addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b)return;
   state.fmt=b.dataset.fmt;
@@ -470,7 +462,7 @@ $('btnPng').addEventListener('click',downloadPng);
 $('btnCopyHtml').addEventListener('click',copyHtml);
 $('btnDownload').addEventListener('click',download);
 $('btnReset').addEventListener('click',()=>{
-  const d={name:'',title:'',phone:'07 4942 0700',mobile:'',email:'mackay@choicesflooring.com.au',web:'www.choicesflooringmackay.com.au',addr:'14 Discovery Lane, North Mackay QLD 4740',fb:'https://www.facebook.com/choicesmackay/',ig:''};
+  const d={name:'',title:'',phone:'07 4942 0700',mobile:'',email:'mackay@choicesflooring.com.au',web:'www.choicesflooringmackay.com.au',addr:'14 Discovery Lane, North Mackay QLD 4740'};
   Object.keys(d).forEach(k=>{if($('f_'+k))$('f_'+k).value=d[k];});
   state.headshotData=null; $('f_photo').value=''; $('photoLabel').textContent='Upload a photo'; $('photoIc').textContent='↑';
   const pc=document.getElementById('photoClear'); if(pc) pc.remove();
