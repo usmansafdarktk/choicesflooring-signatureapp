@@ -50,6 +50,14 @@
   .seg button.active{background:#fff;color:var(--blue);box-shadow:0 1px 3px rgba(16,42,67,.12)}
   .hidewhenlogo{display:block}
   body.fmt-logo .hidewhenlogo{display:none}
+  .uploadbtn{display:flex;align-items:center;gap:12px;border:1.5px dashed #c3d0dc;border-radius:10px;padding:12px 14px;cursor:pointer;transition:.15s;background:#fbfcfe;margin-bottom:10px}
+  .uploadbtn:hover{border-color:var(--blue);background:#f4f9fe}
+  .uploadbtn .ic{width:36px;height:36px;border-radius:50%;background:rgba(0,95,170,.1);display:flex;align-items:center;justify-content:center;color:var(--blue);font-size:17px;flex-shrink:0;overflow:hidden}
+  .uploadbtn .ic img{width:100%;height:100%;object-fit:cover;border-radius:50%}
+  .uploadbtn .t{font-size:13px;line-height:1.35}
+  .uploadbtn .t b{display:block;color:var(--ink);font-weight:600}
+  .uploadbtn .t span{color:var(--ink-soft);font-size:12px}
+  .clearphoto{font-size:11.5px;color:var(--blue);background:none;border:none;cursor:pointer;padding:0;font-family:inherit;text-decoration:underline}
   .adv{border:1px solid var(--line);border-radius:10px;overflow:hidden}
   .adv>summary{list-style:none;cursor:pointer;padding:12px 14px;font-size:12.5px;font-weight:600;color:var(--ink-soft);background:#fbfcfe;display:flex;align-items:center;gap:8px}
   .adv>summary::-webkit-details-marker{display:none}
@@ -126,9 +134,14 @@
     </div>
 
     <div class="field hidewhenlogo">
-      <label for="f_headshot">Headshot image URL</label>
-      <input type="text" id="f_headshot" placeholder="https://i.imgur.com/xxxxx.png" value="">
-      <div class="help">Paste a hosted, square photo (a circle crop works best). Free way to host one: upload at <b>imgur.com</b> → right-click the image → <b>Copy image address</b>. Leave blank for the plain placeholder circle.</div>
+      <label>Headshot photo</label>
+      <label class="uploadbtn" for="f_photo">
+        <span class="ic" id="photoIc">↑</span>
+        <span class="t"><b id="photoLabel">Upload a photo</b><span>Any photo — it's cropped to a circle for you</span></span>
+      </label>
+      <input type="file" id="f_photo" accept="image/*" style="display:none">
+      <input type="text" id="f_headshot" placeholder="…or paste a hosted image URL (e.g. imgur)" value="">
+      <div class="help" id="photoHelp">Upload for the <b>PNG download</b> and Gmail/Apple Mail. For <b>Outlook</b>, a hosted URL pastes most reliably (upload to <b>imgur.com</b> → <b>Copy image address</b>). Leave both blank for the placeholder circle.</div>
     </div>
 
     <div class="divider"></div>
@@ -162,6 +175,7 @@
       <div class="stage"><div class="paper" id="sigMount"></div></div>
       <div class="actions">
         <button class="btn btn-primary" id="btnCopy"><span>📋</span> Copy signature</button>
+        <button class="btn btn-primary" id="btnPng" style="background:#1ba39c"><span>🖼️</span> Download PNG</button>
         <button class="btn btn-ghost" id="btnCopyHtml">Copy HTML source</button>
         <button class="btn btn-ghost" id="btnDownload">Download .html</button>
         <button class="btn btn-quiet" id="btnReset">Reset</button>
@@ -200,7 +214,7 @@ const A = {
   pin:'https://i.imgur.com/mY6fYrL.png'
 };
 
-const state = { fmt:'headshot' };
+const state = { fmt:'headshot', headshotData:null };
 const $ = id => document.getElementById(id);
 const v = id => ($('f_'+id).value||'').trim();
 const esc = t => (t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -228,8 +242,9 @@ function contacts(padPhone){
   if(web) out+='<p style="margin:0;font-size:12px;">'+icon(A.web)+'&nbsp;&nbsp;<a href="'+webUrl(web)+'" target="_blank" style="color:#000000;text-decoration:none;">'+esc(web)+'</a></p>';
   return out;
 }
+function headshotSrc(){ return state.headshotData || v('headshot') || A.headshotDefault; }
 function topHeadshot(){
-  const hs = v('headshot') || A.headshotDefault;
+  const hs = headshotSrc();
   return '<table width="405" border="0" cellspacing="0" cellpadding="0" style="width:405px;border-collapse:collapse;-webkit-text-size-adjust:none;min-width:405px;"><tr>'
     +'<td width="125" valign="middle" style="text-align:left;"><img border="0" width="110" height="110" src="'+esc(hs)+'" alt="Headshot" style="border-radius:50%;display:block;"></td>'
     +'<td width="280" valign="middle" style="padding-left:5px;">'
@@ -300,6 +315,150 @@ function download(){
   a.click();URL.revokeObjectURL(a.href);toast('Downloaded');
 }
 
+/* ---- headshot upload (circle-crop to a data URI) ---- */
+function cropCircle(img){
+  const s=240, c=document.createElement('canvas'); c.width=c.height=s;
+  const x=c.getContext('2d');
+  x.save(); x.beginPath(); x.arc(s/2,s/2,s/2-6,0,7); x.closePath(); x.clip();
+  const sc=Math.max(s/img.width,s/img.height), w=img.width*sc, h=img.height*sc;
+  x.drawImage(img,(s-w)/2,(s-h)/2,w,h);
+  x.restore();
+  x.beginPath(); x.arc(s/2,s/2,s/2-3,0,7); x.lineWidth=5; x.strokeStyle='#0061a9'; x.stroke();
+  return c.toDataURL('image/png');
+}
+$('f_photo').addEventListener('change',e=>{
+  const file=e.target.files[0]; if(!file) return;
+  const img=new Image();
+  img.onload=()=>{
+    state.headshotData=cropCircle(img);
+    $('f_headshot').value='';
+    $('photoLabel').textContent=file.name;
+    $('photoIc').innerHTML='<img src="'+state.headshotData+'">';
+    if(!document.getElementById('photoClear')){
+      const btn=document.createElement('button');
+      btn.id='photoClear'; btn.className='clearphoto'; btn.type='button'; btn.textContent='Remove photo';
+      btn.onclick=()=>{ state.headshotData=null; $('photoLabel').textContent='Upload a photo'; $('photoIc').textContent='↑'; $('f_photo').value=''; btn.remove(); refresh(); };
+      $('photoHelp').parentNode.insertBefore(btn,$('photoHelp'));
+    }
+    refresh();
+  };
+  img.src=URL.createObjectURL(file);
+});
+
+/* ---- PNG export: composite the signature onto a canvas (bakes in the photo) ---- */
+function loadImg(src){
+  return new Promise(res=>{
+    const i=new Image();
+    if(/^https?:/i.test(src)) i.crossOrigin='anonymous';
+    i.onload=()=>res(i); i.onerror=()=>res(null);
+    i.src=src;
+  });
+}
+async function exportPNG(cb){
+  try{ await document.fonts.load('700 15px "Nunito Sans"'); await document.fonts.load('400 12px "Nunito Sans"'); await document.fonts.ready; }catch(e){}
+  const fmt=state.fmt;
+  const name=v('name'),title=v('title'),phone=v('phone'),mobile=v('mobile'),email=v('email'),web=v('web'),addr=v('addr'),fb=v('fb'),ig=v('ig');
+  const I={};
+  await Promise.all(['banner','ph','mob','mail','web','pin','fb','ig'].map(async k=> I[k]=await loadImg(A[k])));
+  const hs = fmt==='headshot' ? await loadImg(headshotSrc()) : null;
+
+  const S=2, W=405;
+  const F_NAME='700 15px "Nunito Sans", Arial, sans-serif';
+  const F_TITLE='400 11px "Nunito Sans", Arial, sans-serif';
+  const F_TXT ='400 12px "Nunito Sans", Arial, sans-serif';
+  const BLUE='#005faa', BLACK='#000000', LINE='#8bc1e9';
+
+  const m=document.createElement('canvas').getContext('2d');
+  m.font=F_TXT; const tw=s=>m.measureText(s).width;
+
+  const cLines=[]; // contact lines present
+  if(phone||mobile) cLines.push('pm');
+  if(email) cLines.push('em');
+  if(web) cLines.push('wb');
+
+  const bannerH=Math.round(W*(I.banner?I.banner.naturalHeight/I.banner.naturalWidth:181/1406));
+  const stripH=6+1+28, gap=6;
+
+  let topH;
+  if(fmt==='headshot'){
+    const rightH = 33 + 6 + cLines.length*19;
+    topH = Math.max(110, rightH);
+  }else{
+    const rightH = 6 + cLines.length*18;
+    topH = Math.max(40, rightH);
+  }
+  const H = topH + stripH + gap + bannerH;
+
+  const cv=document.createElement('canvas'); cv.width=W*S; cv.height=H*S;
+  const ctx=cv.getContext('2d'); ctx.setTransform(S,0,0,S,0,0);
+  ctx.textBaseline='alphabetic'; ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H);
+
+  function contactLine(x,yC,icon,iconH,text,linkColor){
+    if(icon) ctx.drawImage(icon,x,yC-6,12,12);
+    ctx.font=F_TXT; ctx.fillStyle=linkColor||BLACK; ctx.textBaseline='middle'; ctx.textAlign='left';
+    ctx.fillText(text,x+18,yC);
+    return 18+tw(text);
+  }
+  function drawContacts(x,yTop){
+    let yC=yTop+9;
+    if(phone||mobile){
+      let cx=x;
+      if(phone){ cx+=contactLine(cx,yC,I.ph,12,phone)+8; }
+      if(mobile){ if(I.mob) ctx.drawImage(I.mob,cx,yC-6,12,12); ctx.fillStyle=BLACK;ctx.font=F_TXT;ctx.textBaseline='middle';ctx.fillText(mobile,cx+18,yC); }
+      yC+=19;
+    }
+    if(email){ contactLine(x,yC,I.mail,12,email); yC+=19; }
+    if(web){ contactLine(x,yC,I.web,12,web); yC+=19; }
+  }
+
+  if(fmt==='headshot'){
+    // headshot (clipped to circle)
+    const hsY=Math.round((topH-110)/2);
+    if(hs){ ctx.save(); ctx.beginPath(); ctx.arc(55,hsY+55,55,0,7); ctx.closePath(); ctx.clip();
+      const sc=Math.max(110/hs.width,110/hs.height), w=hs.width*sc, h=hs.height*sc;
+      ctx.drawImage(hs, 55-w/2, hsY+55-h/2, w, h); ctx.restore(); }
+    const rightH=33+6+cLines.length*19;
+    let y=Math.round((topH-rightH)/2);
+    ctx.textAlign='left'; ctx.textBaseline='top';
+    ctx.fillStyle=BLUE; ctx.font=F_NAME; ctx.fillText(name,130,y);
+    ctx.fillStyle=BLACK; ctx.font=F_TITLE; ctx.fillText(title,130,y+19);
+    drawContacts(130, y+33+6);
+  }else{
+    const ntH=33; let ly=Math.round((topH-ntH)/2);
+    ctx.textAlign='left'; ctx.textBaseline='top';
+    ctx.fillStyle=BLUE; ctx.font=F_NAME; ctx.fillText(name,0,ly);
+    ctx.fillStyle=BLACK; ctx.font=F_TITLE; ctx.fillText(title,0,ly+19);
+    ctx.strokeStyle=LINE; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(135.5,4); ctx.lineTo(135.5,topH-4); ctx.stroke();
+    const rightH=6+cLines.length*18;
+    drawContacts(150, Math.round((topH-rightH)/2)+6);
+  }
+
+  // strip: border + address + socials
+  const by=topH+6;
+  ctx.strokeStyle=LINE; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(0,by+0.5); ctx.lineTo(W,by+0.5); ctx.stroke();
+  const cyc=by+1+14;
+  if(addr){ if(I.pin) ctx.drawImage(I.pin,0,cyc-6,12,12); ctx.fillStyle=BLACK;ctx.font=F_TXT;ctx.textBaseline='middle';ctx.textAlign='left'; ctx.fillText(addr,18,cyc); }
+  const socials=[]; if(fb&&I.fb) socials.push(I.fb); if(ig&&I.ig) socials.push(I.ig);
+  if(socials.length){ const gw=socials.length*20+(socials.length-1)*5; let sx=W-gw;
+    socials.forEach(im=>{ ctx.drawImage(im,sx,cyc-10,20,20); sx+=25; }); }
+
+  // banner
+  const bnY=topH+stripH+gap;
+  if(I.banner) ctx.drawImage(I.banner,0,bnY,W,bannerH);
+
+  try{ cb(null, cv.toDataURL('image/png')); }catch(err){ cb(err); }
+}
+function downloadPng(){
+  exportPNG((err,url)=>{
+    if(err){ toast('PNG blocked (headshot host has no CORS) — upload the photo instead'); return; }
+    const a=document.createElement('a');
+    a.href=url;
+    a.download=((v('name')||'signature').toLowerCase().replace(/[^a-z0-9]+/g,'-'))+'-'+state.fmt+'-signature.png';
+    a.click();
+    toast('PNG downloaded');
+  });
+}
+
 ['name','title','phone','mobile','email','web','headshot','addr','fb','ig'].forEach(f=>$('f_'+f)&&$('f_'+f).addEventListener('input',refresh));
 $('fmtSeg').addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b)return;
@@ -309,11 +468,14 @@ $('fmtSeg').addEventListener('click',e=>{
   refresh();
 });
 $('btnCopy').addEventListener('click',copyRich);
+$('btnPng').addEventListener('click',downloadPng);
 $('btnCopyHtml').addEventListener('click',copyHtml);
 $('btnDownload').addEventListener('click',download);
 $('btnReset').addEventListener('click',()=>{
   const d={name:'',title:'',phone:'07 4942 0700',mobile:'',email:'mackay@choicesflooring.com.au',web:'www.choicesflooringmackay.com.au',headshot:'',addr:'14 Discovery Lane, North Mackay QLD 4740',fb:'https://www.facebook.com/choicesmackay/',ig:''};
   Object.keys(d).forEach(k=>{if($('f_'+k))$('f_'+k).value=d[k];});
+  state.headshotData=null; $('f_photo').value=''; $('photoLabel').textContent='Upload a photo'; $('photoIc').textContent='↑';
+  const pc=document.getElementById('photoClear'); if(pc) pc.remove();
   refresh();toast('Reset');
 });
 
