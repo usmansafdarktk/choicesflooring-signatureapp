@@ -42,6 +42,9 @@
   .field input[type=text]{width:100%;padding:11px 13px;font-size:14px;font-family:inherit;color:var(--ink);border:1px solid var(--line);border-radius:10px;background:#fbfcfe;transition:border-color .15s,box-shadow .15s}
   .field input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,95,170,.12);background:#fff}
   .field input::placeholder{color:#a9b6c2}
+  .field textarea{width:100%;padding:11px 13px;font-size:14px;font-family:inherit;color:var(--ink);border:1px solid var(--line);border-radius:10px;background:#fbfcfe;transition:border-color .15s,box-shadow .15s;resize:vertical;min-height:60px;line-height:1.4}
+  .field textarea:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,95,170,.12);background:#fff}
+  .field textarea::placeholder{color:#a9b6c2}
   .field .help{font-size:11.5px;color:var(--ink-soft);margin-top:6px;line-height:1.5}
   .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .divider{height:1px;background:var(--line);margin:22px 0}
@@ -143,6 +146,12 @@
       <div class="help" id="photoHelp">The photo is baked into the <b>Download PNG</b> (best for Outlook) and shows in Gmail/Apple Mail. Leave blank for the placeholder circle.</div>
     </div>
 
+    <div class="field">
+      <label for="f_notes">Notes <span style="text-transform:none;font-weight:400">(optional)</span></label>
+      <textarea id="f_notes" placeholder="e.g. Please note I work Monday–Wednesday, 9am–3pm"></textarea>
+      <div class="help">Shows as a small italic line above the banner. Handy for part-time or irregular hours.</div>
+    </div>
+
     <div class="divider"></div>
     <p class="section-title">Company details</p>
     <p class="section-sub">Shared across the team - pre-filled, edit only if needed.</p>
@@ -168,14 +177,13 @@
         <button class="btn btn-quiet" id="btnReset">Reset</button>
       </div>
       <div class="hint">
-        <b>New Outlook / Outlook on the web:</b>
+        <b>Use “Copy signature” to keep links clickable</b> (phone, email, website &amp; socials all work). The <b>Download PNG</b> is a picture, so its links are <u>not</u> clickable - only use it if pasting ever fails.
         <ol>
           <li>Click <b>Copy signature</b>.</li>
-          <li>Open <b>Settings → Mail → Compose and reply → Signature</b>, name it, click into the box and <b>paste</b> (⌘V / Ctrl+V).</li>
-          <li>Set it as default for new messages &amp; replies, then <b>Save</b>. Because the images are hosted, they stay visible and links stay clickable.</li>
+          <li>Open your signature editor - <b>New Outlook:</b> Settings → Mail → Compose and reply → Signature. <b>Gmail:</b> Settings → General → Signature. <b>Apple Mail:</b> Settings → Signatures.</li>
+          <li>Name it, click into the box, <b>paste</b> (⌘V / Ctrl+V), set as default, and Save.</li>
         </ol>
-        <span style="display:block;margin-top:8px"><b>Gmail / Apple Mail / classic Outlook:</b> same idea - <b>Copy signature</b>, then paste into the signature box.</span>
-        <span style="display:block;margin-top:8px;color:#8695a3">If any client strips the paste, use <b>Download .html</b> and open/import that file instead.</span>
+        <span style="display:block;margin-top:8px;color:#8695a3"><b>Note:</b> links don't open while you're editing/composing - they become clickable for the person who receives your email. If a client strips the paste, use <b>Download .html</b> and open/import that file.</span>
       </div>
     </div>
   </section>
@@ -246,8 +254,8 @@ function topHeadshot(){
 }
 function topLogo(){
   return '<table width="405" border="0" cellspacing="0" cellpadding="0" style="width:405px;border-collapse:collapse;-webkit-text-size-adjust:none;min-width:405px;"><tr>'
-    +'<td width="135" valign="middle" style="text-align:left;border-right:1px solid #8bc1e9;">'+nameTitle()+'</td>'
-    +'<td width="270" valign="middle" style="padding-left:15px;">'
+    +'<td width="135" valign="middle" style="text-align:left;border-right:1px solid #8bc1e9;padding-right:18px;">'+nameTitle()+'</td>'
+    +'<td width="270" valign="middle" style="padding-left:18px;">'
     +'<table width="100%" cellpadding="0" cellspacing="0"><tr><td style="padding-top:6px;line-height:18px;">'+contacts(false)+'</td></tr></table>'
     +'</td></tr></table>';
 }
@@ -271,9 +279,13 @@ function banner(){
     +'<a href="'+url+'" target="_blank"><img src="'+A.banner+'" alt="Choices Flooring Mackay" width="405" style="display:block;border:0;"></a>'
     +'</td></tr></table>';
 }
+function notesRow(){
+  const n=v('notes'); if(!n) return '';
+  return '<table width="405" border="0" cellspacing="0" cellpadding="0" style="width:405px;border-collapse:collapse;min-width:405px;"><tr><td style="padding-top:8px;font-family:Nunito Sans,Arial,Helvetica,sans-serif;font-size:11px;font-style:italic;color:#555555;line-height:15px;">'+esc(n).replace(/\n/g,'<br>')+'</td></tr></table>';
+}
 function buildSignature(){
   const top = state.fmt==='headshot' ? topHeadshot() : topLogo();
-  return '<div style="font-family:Nunito Sans,Arial,Helvetica,sans-serif;">'+top+strip()+banner()+'</div>';
+  return '<div style="font-family:Nunito Sans,Arial,Helvetica,sans-serif;">'+top+strip()+notesRow()+banner()+'</div>';
 }
 
 let lastHtml='';
@@ -336,6 +348,11 @@ $('f_photo').addEventListener('change',e=>{
 });
 
 /* ---- PNG export: composite the signature onto a canvas (bakes in the photo) ---- */
+function wrapText(ctx,text,maxW){
+  const words=text.split(/\s+/), lines=[]; let cur='';
+  words.forEach(w=>{ const t=cur?cur+' '+w:w; if(ctx.measureText(t).width>maxW && cur){lines.push(cur);cur=w;} else cur=t; });
+  if(cur||lines.length===0) lines.push(cur); return lines;
+}
 function loadImg(src){
   return new Promise(res=>{
     const i=new Image();
@@ -369,6 +386,12 @@ async function exportPNG(cb){
   const bannerH=Math.round(W*(I.banner?I.banner.naturalHeight/I.banner.naturalWidth:181/1406));
   const stripH=6+1+28, gap=6;
 
+  // notes (wrapped)
+  const notes=v('notes'); let noteLines=[];
+  if(notes){ m.font='italic 400 11px "Nunito Sans", Arial, sans-serif';
+    notes.split('\n').forEach(par=>{ if(!par.trim()){noteLines.push('');return;} wrapText(m,par,W).forEach(l=>noteLines.push(l)); }); }
+  const notesH = noteLines.length ? 8 + noteLines.length*15 : 0;
+
   let topH;
   if(fmt==='headshot'){
     const rightH = 33 + 6 + cLines.length*19;
@@ -377,7 +400,7 @@ async function exportPNG(cb){
     const rightH = 6 + cLines.length*18;
     topH = Math.max(40, rightH);
   }
-  const H = topH + stripH + gap + bannerH;
+  const H = topH + stripH + notesH + gap + bannerH;
 
   const cv=document.createElement('canvas'); cv.width=W*S; cv.height=H*S;
   const ctx=cv.getContext('2d'); ctx.setTransform(S,0,0,S,0,0);
@@ -432,8 +455,15 @@ async function exportPNG(cb){
   if(socials.length){ const gw=socials.length*20+(socials.length-1)*5; let sx=W-gw;
     socials.forEach(im=>{ ctx.drawImage(im,sx,cyc-10,20,20); sx+=25; }); }
 
+  // notes
+  if(noteLines.length){
+    ctx.font='italic 400 11px "Nunito Sans", Arial, sans-serif'; ctx.fillStyle='#555555'; ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+    let ny=topH+stripH+8+11;
+    noteLines.forEach(l=>{ if(l) ctx.fillText(l,0,ny); ny+=15; });
+  }
+
   // banner
-  const bnY=topH+stripH+gap;
+  const bnY=topH+stripH+notesH+gap;
   if(I.banner) ctx.drawImage(I.banner,0,bnY,W,bannerH);
 
   try{ cb(null, cv.toDataURL('image/png')); }catch(err){ cb(err); }
@@ -449,7 +479,7 @@ function downloadPng(){
   });
 }
 
-['name','title','phone','mobile','email','web','addr'].forEach(f=>$('f_'+f)&&$('f_'+f).addEventListener('input',refresh));
+['name','title','phone','mobile','email','web','addr','notes'].forEach(f=>$('f_'+f)&&$('f_'+f).addEventListener('input',refresh));
 $('fmtSeg').addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b)return;
   state.fmt=b.dataset.fmt;
@@ -462,7 +492,7 @@ $('btnPng').addEventListener('click',downloadPng);
 $('btnCopyHtml').addEventListener('click',copyHtml);
 $('btnDownload').addEventListener('click',download);
 $('btnReset').addEventListener('click',()=>{
-  const d={name:'',title:'',phone:'07 4942 0700',mobile:'',email:'mackay@choicesflooring.com.au',web:'www.choicesflooringmackay.com.au',addr:'14 Discovery Lane, North Mackay QLD 4740'};
+  const d={name:'',title:'',phone:'07 4942 0700',mobile:'',email:'mackay@choicesflooring.com.au',web:'www.choicesflooringmackay.com.au',addr:'14 Discovery Lane, North Mackay QLD 4740',notes:''};
   Object.keys(d).forEach(k=>{if($('f_'+k))$('f_'+k).value=d[k];});
   state.headshotData=null; $('f_photo').value=''; $('photoLabel').textContent='Upload a photo'; $('photoIc').textContent='↑';
   const pc=document.getElementById('photoClear'); if(pc) pc.remove();
